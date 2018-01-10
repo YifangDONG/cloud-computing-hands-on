@@ -13,6 +13,8 @@
     <version.maven.compiler>3.6.1</version.maven.compiler>
     <version.spark>2.5</version.spark>
     <version.junit>4.10</version.junit>
+    <version.commons-lang>2.6</version.commons-lang>
+    <version.log4j>1.2.17</version.log4j>
   </properties>
   
   <dependencies>
@@ -35,7 +37,17 @@
       <version>${version.junit}</version>
       <scope>test</scope>
     </dependency>
+	<dependency>
+		<groupId>commons-lang</groupId>
+		<artifactId>commons-lang</artifactId>
+		<version>${version.commons-lang}</version>
+	</dependency>
 
+	<dependency>
+		<groupId>log4j</groupId>
+		<artifactId>log4j</artifactId>
+		<version>${version.log4j}</version>
+	</dependency>
   </dependencies>
 
   <build>
