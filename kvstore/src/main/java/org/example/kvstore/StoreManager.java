@@ -3,7 +3,7 @@ package org.example.kvstore;
 
 public class StoreManager {
 
-    public static final String DEFAULT_STORE = "__luKVS";
+    public static final String DEFAULT_STORE = "__xxKVS";
         
     public <K,V> Store<K,V> newStore() {
         return newStore(DEFAULT_STORE);

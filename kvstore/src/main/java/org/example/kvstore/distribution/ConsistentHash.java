@@ -31,5 +31,16 @@ public class ConsistentHash implements Strategy {
 			return addresses.get(ring.ceiling(key.hashCode()));
 		}
 	}
+	@Override
+	public boolean ContainsNode(Address node) {
+		if(this.addresses.containsValue(node)) {
+			return true;
+		}
+		return false;
+	}
+	@Override
+	public int size() {
+		return this.addresses.size();
+	}
 
 }

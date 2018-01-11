@@ -15,15 +15,21 @@ import org.jgroups.ReceiverAdapter;
 import org.jgroups.View;
 
 import java.util.HashMap;
+import java.util.Iterator;
+import java.util.List;
 import java.util.Map;
+import java.util.Map.Entry;
 import java.util.concurrent.Callable;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.stream.Collectors;
 
 public class StoreImpl<K, V> extends ReceiverAdapter implements Store<K, V> {
 
-	private boolean debuge = false;
+	private boolean debug = true;
+	private boolean debugChangeview = true;
+
 	private String name;
 	private Strategy strategy;
 	private Map<K, V> data;
@@ -47,6 +53,7 @@ public class StoreImpl<K, V> extends ReceiverAdapter implements Store<K, V> {
 
 	}
 	public void stop() {
+		
 		this.channel.close();
 	}
 
@@ -63,49 +70,65 @@ public class StoreImpl<K, V> extends ReceiverAdapter implements Store<K, V> {
 	public void receive(Message msg) {
 		Address dst = msg.getSrc();
 		Command<K,V> cmd = (Command<K,V>) SerializationUtils.deserialize(msg.getBuffer());
-		if(debuge) {System.out.println(channel.getAddressAsString() +" recive command : " + cmd.toString() + " from node " + dst.toString());}
-		workers.submit(new CmdHandler(dst, cmd));
-	}
-
-	private class CmdHandler implements Callable<Void> {
-		Address address;
-		Command<K, V> command;
-
-		public CmdHandler(Address address, Command<K, V> command) {
-			this.address = address;
-			this.command = command;
-		}
-
-		@Override
-		public Void call() throws Exception {
+		if(debug) {System.out.println(channel.getAddressAsString() +" recive command : " + cmd.toString() + " from node " + dst.toString());}
+		workers.submit(() -> {
 			V value = null;
-			if (command instanceof Reply) {
-				value = command.getValue();
+			if (cmd instanceof Reply) {
+				value = cmd.getValue();
 				pending.complete(value);
-				return null;
-			} else if (command instanceof Get) {
-				value = get(command.getKey());
-			} else if (command instanceof Put) {
-				if(debuge) {System.out.println(command.getKey().toString() + " put " + command.getValue().toString());}
-				value = put(command.getKey(), command.getValue());
-				if(debuge) {System.out.println(" value " + command.getValue().toString());}
-
-			}
-			Reply<K, V> reply = factory.newReplyCmd(command.getKey(), value);
-			send(address,reply);
-			return null;
-		}
-
+			} else if (cmd instanceof Get || cmd instanceof Put) {
+				value = execute(cmd);
+				Reply<K, V> reply = factory.newReplyCmd(cmd.getKey(), value);
+				send(dst,reply);
+			} 
+		});
+		
 	}
 
 	@Override
 	public void viewAccepted(View view) {
-		this.strategy = new ConsistentHash(view);
+		if(this.strategy == null) {
+			//it is a new node added
+			this.strategy = new ConsistentHash(view);
+		}else {
+			if( view.size() > strategy.size()) {
+				//add node in view
+				
+				//find the new node
+				Address newNode = view.getMembers().stream()
+						.filter(e -> !strategy.ContainsNode(e))
+						.collect(Collectors.toList()).get(0);
+				
+				//find node next to new node;
+				Address changeNode = strategy.lookup(newNode);
+				if(debugChangeview) {System.out.println("[new Node]" + newNode.toString());}
+				if(debugChangeview) {System.out.println("[change Node]" + changeNode.toString());}
+
+				//change to new view
+				this.strategy = new ConsistentHash(view);
+				
+				if(channel.getAddress() == changeNode) {
+					for(Iterator<Entry<K,V>> i = data.entrySet().iterator(); i.hasNext();) {
+						Entry<K,V> e = i.next();
+						if(strategy.lookup(e.getKey()).equals(channel.getAddress())) {
+							//data need to be moved to new node
+							put(e.getKey(),e.getValue());
+							data.remove(e);
+						}
+					}
+				}
+				
+			}else {
+				//delete node in view
+			}
+		}
 	}
 
 	@Override
 	public V get(K k) {
-		return execute(factory.newGetCmd(k));
+		V result = execute(factory.newGetCmd(k));
+		if(debug) {System.out.println(channel.getAddressAsString() + " get result and return :" + result);}
+		return result;
 	}
 
 	@Override
@@ -118,17 +141,15 @@ public class StoreImpl<K, V> extends ReceiverAdapter implements Store<K, V> {
 		V value = (V) cmd.getValue();
 		Address dst = strategy.lookup(key);
 		if(dst.equals(channel.getAddress())) {
-			if(debuge) {System.out.println("[local]" + channel.getAddressAsString() +" execute command : " + cmd.toString() + " in node " + dst.toString());}
+			if(debug) {System.out.println("[local]" + channel.getAddressAsString() +" execute command : " + cmd.toString() + " in node " + dst.toString());}
 			if(cmd instanceof Put) {
-				V prior = data.get(key);
-				data.put(key, value);
-				return prior;
+				return data.put(key, value);
 			}else if(cmd instanceof Get) {
 				return data.get(key);
 			}
 		} else if (dst != null){
 			synchronized(pending) {
-				if(debuge) {System.out.println("[remote]" + channel.getAddressAsString() +" execute command : " + cmd.toString() + " in node " + dst.toString());}
+				if(debug) {System.out.println("[remote]" + channel.getAddressAsString() +" execute command : " + cmd.toString() + " in node " + dst.toString());}
 				if(cmd instanceof Put) {
 					pending = CompletableFuture.supplyAsync(() -> {
 						send(dst, factory.newPutCmd(key,value));
