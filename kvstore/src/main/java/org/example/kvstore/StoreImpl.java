@@ -16,10 +16,8 @@ import org.jgroups.View;
 
 import java.util.HashMap;
 import java.util.Iterator;
-import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
-import java.util.concurrent.Callable;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -27,8 +25,8 @@ import java.util.stream.Collectors;
 
 public class StoreImpl<K, V> extends ReceiverAdapter implements Store<K, V> {
 
-	private boolean debug = true;
-	private boolean debugChangeview = true;
+	private boolean debug = false;
+	private boolean debugChangeview = false;
 
 	private String name;
 	private Strategy strategy;
@@ -75,12 +73,18 @@ public class StoreImpl<K, V> extends ReceiverAdapter implements Store<K, V> {
 			V value = null;
 			if (cmd instanceof Reply) {
 				value = cmd.getValue();
-				pending.complete(value);
-			} else if (cmd instanceof Get || cmd instanceof Put) {
-				value = execute(cmd);
+				synchronized(pending) {
+					pending.complete(value);
+				}
+			} else {
+				if (cmd instanceof Get) {
+					value = data.get(cmd.getKey());
+				} else if (cmd instanceof Put) {
+					value = data.put(cmd.getKey(), cmd.getValue());
+				}
 				Reply<K, V> reply = factory.newReplyCmd(cmd.getKey(), value);
 				send(dst,reply);
-			} 
+			}
 		});
 		
 	}
@@ -136,36 +140,52 @@ public class StoreImpl<K, V> extends ReceiverAdapter implements Store<K, V> {
 		return execute(factory.newPutCmd(k, v));
 	}
 	
+//	public V execute(Command cmd) {
+//		K key = (K) cmd.getKey();
+//		V value = (V) cmd.getValue();
+//		Address dst = strategy.lookup(key);
+//		if(dst.equals(channel.getAddress())) {
+//			if(debug) {System.out.println("[local]" + channel.getAddressAsString() +" execute command : " + cmd.toString() + " in node " + dst.toString());}
+//			if(cmd instanceof Put) {
+//				return data.put(key, value);
+//			}else if(cmd instanceof Get) {
+//				return data.get(key);
+//			}
+//		} else if (dst != null){
+//			synchronized(pending) {
+//				if(debug) {System.out.println("[remote]" + channel.getAddressAsString() +" execute command : " + cmd.toString() + " in node " + dst.toString());}
+//				if(cmd instanceof Put) {
+//					pending = new CompletableFuture<>();
+//					send(dst, factory.newPutCmd(key,value));
+//					pending.join();
+//				}else if(cmd instanceof Get) {
+//					pending = CompletableFuture.supplyAsync(() -> {
+//						send(dst, factory.newGetCmd(key));
+//						return pending.join();
+//
+//					});
+//				}
+//				return pending.join();
+//			}
+//		}
+//		return null;
+//	}
+	
 	public V execute(Command cmd) {
 		K key = (K) cmd.getKey();
 		V value = (V) cmd.getValue();
 		Address dst = strategy.lookup(key);
-		if(dst.equals(channel.getAddress())) {
-			if(debug) {System.out.println("[local]" + channel.getAddressAsString() +" execute command : " + cmd.toString() + " in node " + dst.toString());}
+		synchronized(pending) {
+			if(debug) {System.out.println(channel.getAddressAsString() +" execute command : " + cmd.toString() + " in node " + dst.toString());}
 			if(cmd instanceof Put) {
-				return data.put(key, value);
+				pending = new CompletableFuture<>();
+				send(dst, factory.newPutCmd(key,value));
 			}else if(cmd instanceof Get) {
-				return data.get(key);
+				pending = new CompletableFuture<>();
+				send(dst, factory.newGetCmd(key));
 			}
-		} else if (dst != null){
-			synchronized(pending) {
-				if(debug) {System.out.println("[remote]" + channel.getAddressAsString() +" execute command : " + cmd.toString() + " in node " + dst.toString());}
-				if(cmd instanceof Put) {
-					pending = CompletableFuture.supplyAsync(() -> {
-						send(dst, factory.newPutCmd(key,value));
-						return pending.join();
-					});
-				}else if(cmd instanceof Get) {
-					pending = CompletableFuture.supplyAsync(() -> {
-						send(dst, factory.newGetCmd(key));
-						return pending.join();
-
-					});
-				}
-				return pending.join();
-			}
+			return pending.join();
 		}
-		return null;
 	}
 
 	@Override

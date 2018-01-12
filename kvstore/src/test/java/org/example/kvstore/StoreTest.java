@@ -21,30 +21,29 @@ public class StoreTest {
 //
 //    }
 
-//    @Test
-//    public void multipleStores(){
-//        int NCALLS = 1000;
-//        Random rand = new Random(System.nanoTime());
-//
-//        StoreManager manager = new StoreManager();
-//        Store<Integer, Integer> store1 = manager.newStore();
-//        Store<Integer, Integer> store2 = manager.newStore();
-//        Store<Integer, Integer> store3 = manager.newStore();
-//        for (int i=0; i<NCALLS; i++) {
-//	        System.out.println(i);
-//	        int k = rand.nextInt();
-//	        int v = rand.nextInt();
-//	        store1.put(k, v);
-//	        assert rand.nextBoolean() ? store2.get(k).equals(v) : store3.get(k).equals(v);
-//	    }
-//        manager.stop(store3);
-//        manager.stop(store2);
-//        manager.stop(store1);
-//    }
-    
+    @Test
+    public void multipleStores(){
+        int NCALLS = 1000;
+        Random rand = new Random(System.nanoTime());
+
+        StoreManager manager = new StoreManager();
+        Store<Integer, Integer> store1 = manager.newStore();
+        Store<Integer, Integer> store2 = manager.newStore();
+        Store<Integer, Integer> store3 = manager.newStore();
+        for (int i=0; i<NCALLS; i++) {
+	        int k = rand.nextInt();
+	        int v = rand.nextInt();
+	        store1.put(k, v);
+	        assert rand.nextBoolean() ? store2.get(k).equals(v) : store3.get(k).equals(v);
+	    }
+        manager.stop(store3);
+        manager.stop(store2);
+        manager.stop(store1);
+    }
+   
     @Test
     public void dataMigration() {
-    	int NCALLS = 10;
+    	int NCALLS = 1000;
         Random rand = new Random(System.nanoTime());
 
         StoreManager manager = new StoreManager();
@@ -55,7 +54,7 @@ public class StoreTest {
         store.add(manager.newStore());
 
         for (int i=0; i<NCALLS; i++) {
-        	if(i%3 == 0) {
+        	if(i%59 == 0) {
         		store.add(manager.newStore());
         	}
 //        	else if(i%55 == 0) {
