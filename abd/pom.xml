@@ -14,6 +14,7 @@
     <version.spark>2.5</version.spark>
     <version.junit>4.10</version.junit>
     <version.apache.commons-lang3>3.7</version.apache.commons-lang3>
+    <version.log4j>1.2.17</version.log4j>
   </properties>
   
   <dependencies>
@@ -42,6 +43,12 @@
       <artifactId>commons-lang3</artifactId>
       <version>${version.apache.commons-lang3}</version>
     </dependency>
+
+	<dependency>
+	    <groupId>log4j</groupId>
+	    <artifactId>log4j</artifactId>
+	    <version>${version.log4j}</version>
+	</dependency>
 
   </dependencies>
 
