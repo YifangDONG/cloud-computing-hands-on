@@ -101,6 +101,8 @@ public class RegisterImpl<V> extends ReceiverAdapter implements Register<V>{
     			return null;
     		}	 
     	}
+
+        return null;
     }
 
     // Message handlers
