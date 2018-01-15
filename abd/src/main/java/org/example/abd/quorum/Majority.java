@@ -3,26 +3,26 @@ package org.example.abd.quorum;
 import org.jgroups.Address;
 import org.jgroups.View;
 
-import java.util.ArrayList;
 import java.util.List;
+import java.util.Random;
 
 public class Majority {
-	private View view;
+	private List<Address> quorum;
 
     public Majority(View view){
-    	this.view = view;
+    	while(quorum.size() < view.getMembers().size()/2+1) {
+    		Random rand = new Random(System.nanoTime());
+    		Address e = view.get(rand.nextInt(view.getMembers().size()));
+    		if(!quorum.contains(e))
+    		quorum.add(e);
+    	}
     }
 
     public int quorumSize(){
-        return view.size();
+        return quorum.size();
     }
 
     public List<Address> pickQuorum(){
-    	List<Address> quorum = new ArrayList<>();
-    	while(quorum.size() < this.quorumSize()/2 + 1) {
-    		quorum.add(view.get((int) (Math.random() * this.quorumSize() - 1)));
-    	}
         return quorum;
     }
-
 }

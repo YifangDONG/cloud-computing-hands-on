@@ -15,11 +15,11 @@ import org.jgroups.Message;
 import org.jgroups.ReceiverAdapter;
 import org.jgroups.View;
 
-import java.util.HashMap;
 import java.util.Iterator;
 import java.util.Map;
 import java.util.Map.Entry;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.stream.Collectors;
@@ -46,7 +46,7 @@ public class StoreImpl<K, V> extends ReceiverAdapter implements Store<K, V> {
 	}
 
 	public void init() throws Exception {
-		data = new HashMap<>();
+		data = new ConcurrentHashMap<>();
 		workers = Executors.newCachedThreadPool();
 		channel = new JChannel();
 		channel.setReceiver(this);
@@ -58,14 +58,32 @@ public class StoreImpl<K, V> extends ReceiverAdapter implements Store<K, V> {
 		if (debugChangeview) {
 			System.out.println("[delete Node]" + channel.getAddressAsString());
 		}
-		strategy.delete(channel.getAddress());
-		if (strategy.size() != 0) {
-			// there are nodes alive.
-			data.entrySet().stream().forEach(e -> {
-				put(e.getKey(), e.getValue());
-			});
+		if(mode.toUpperCase().equals("CONSISTENTHASH")) {
+			strategy.delete(channel.getAddress());
+			if (strategy.size() != 0) {
+				// there are nodes alive.
+				data.entrySet().stream().forEach(e -> {
+					put(e.getKey(), e.getValue());
+				});
+			}
+			channel.close();
+		} else if(mode.toUpperCase().equals("CONSISTENTHASH")) {
+			strategy.delete(channel.getAddress());
+			if (strategy.size() != 0) {
+				// there are nodes alive.
+				data.entrySet().stream().forEach(e -> {
+					put(e.getKey(), e.getValue());
+				});
+			}
+			try {
+				// wait for all node update finished, really bad solution.
+				Thread.sleep(5000);
+			} catch (InterruptedException e) {
+				// TODO Auto-generated catch block
+				e.printStackTrace();
+			}
+			channel.close();
 		}
-		channel.close();
 	}
 
 	@Override
@@ -95,12 +113,13 @@ public class StoreImpl<K, V> extends ReceiverAdapter implements Store<K, V> {
 					strategy = new ConsistentHash(view);
 
 					if (channel.getAddress() == changeNode) {
+						// Map<K, V> dataDelete = new HashMap<>();
 						for (Iterator<Entry<K, V>> i = data.entrySet().iterator(); i.hasNext();) {
 							Entry<K, V> e = i.next();
 							if (!strategy.lookup(e.getKey()).equals(channel.getAddress())) {
 								// data need to be moved to new node
 								put(e.getKey(), e.getValue());
-								data.remove(e);
+								data.remove(e.getKey(), e.getValue());
 							}
 						}
 					}
@@ -112,13 +131,25 @@ public class StoreImpl<K, V> extends ReceiverAdapter implements Store<K, V> {
 			}
 		} else if (mode.toUpperCase().equals("ROUNDROBIN")) {
 			strategy = new RoundRobin(view);
+			if (debug) {
+				System.out.println(channel.getAddressAsString() + " replace data");
+			}
 			for (Iterator<Entry<K, V>> i = data.entrySet().iterator(); i.hasNext();) {
 				Entry<K, V> e = i.next();
 				if (!strategy.lookup(e.getKey()).equals(channel.getAddress())) {
-					
 					put(e.getKey(), e.getValue());
-					data.remove(e);
+					data.remove(e.getKey(), e.getValue());
 				}
+			}
+			try {
+				// wait for all node update finished, really bad solution.
+				Thread.sleep(5000);
+			} catch (InterruptedException e) {
+				// TODO Auto-generated catch block
+				e.printStackTrace();
+			}
+			if (debug) {
+				System.out.println(channel.getAddressAsString() + " replace data finished");
 			}
 		}
 	}
@@ -163,7 +194,7 @@ public class StoreImpl<K, V> extends ReceiverAdapter implements Store<K, V> {
 	@Override
 	public V get(K k) {
 		Address dst = strategy.lookup(k);
-		
+
 		synchronized (pending) {
 			if (debug) {
 				System.out.println(

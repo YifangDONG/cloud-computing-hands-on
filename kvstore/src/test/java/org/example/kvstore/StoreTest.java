@@ -84,13 +84,12 @@ public class StoreTest {
         manager.stop(store1);
         assert store2.get(k).equals(v);
         manager.stop(store2);
-    }
-  */ 
-   
+    } 
+ */  
 	@Test
     public void roundRobin() {
-    	int NCALLS = 100;
-    	final String name = "__dlmKVS";
+    	int NCALLS = 10;
+    	final String name = "__uxKVS";
     	final String mode = "RoundRobin";
         Random rand = new Random(System.nanoTime());
 
@@ -102,16 +101,14 @@ public class StoreTest {
         store.add(manager.newStore(name,mode));
 
         for (int i=1; i<NCALLS; i++) {
-            System.out.println(i);
-
-        	if(i%54 == 0) {
+        	if(i%2 == 0) {
         		store.add(manager.newStore(name,mode));
         	}
-//        	else if(i%55 == 0) {
-//        		//stop the last store in the list;
-//        		manager.stop(store.get(store.size()-1));
-//        		store.remove(store.size()-1);
-//        	}
+        	else if(i%3 == 0) {
+        		//stop the last store in the list;
+        		manager.stop(store.get(store.size()-1));
+        		store.remove(store.size()-1);
+        	}
         	int k = rand.nextInt();
 	        int v = rand.nextInt();
 	        store.get(0).put(k, v);

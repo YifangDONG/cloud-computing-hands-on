@@ -9,11 +9,13 @@ import org.jgroups.View;
 public class RoundRobin implements Strategy {
 
 	private List<Address> addresses;
-	
+
 	public RoundRobin(View view) {
 		addresses = new LinkedList<>();
 		List<Address> members = view.getMembers();
-		members.stream().forEach(e ->{addresses.add(e);});
+		members.stream().forEach(e -> {
+			addresses.add(e);
+		});
 	}
 
 	@Override

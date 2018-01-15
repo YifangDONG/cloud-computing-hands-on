@@ -26,7 +26,7 @@ public class RegisterTest {
 
     }
 
-    @Test
+  /*  @Test
     public void concurrent() throws ExecutionException, InterruptedException {
         int NCALLS = 1000;
 
@@ -45,7 +45,7 @@ public class RegisterTest {
             future.get();
         }
     }
-
+*/
     //
 
     private abstract class Worker implements Callable<Void>{

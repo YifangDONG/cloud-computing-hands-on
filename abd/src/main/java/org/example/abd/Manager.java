@@ -5,7 +5,7 @@ public class Manager {
     public static final String DEFAULT_STORE = "__reg";
 
     public <V> Register<V> newRegister() {
-        return newRegister(DEFAULT_STORE);
+        return newRegister(DEFAULT_STORE,false);
     }
 
     public <V> Register<V> newRegister(String name){

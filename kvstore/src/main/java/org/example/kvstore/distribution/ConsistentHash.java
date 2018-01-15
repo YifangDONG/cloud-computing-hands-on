@@ -31,13 +31,15 @@ public class ConsistentHash implements Strategy {
 			return addresses.get(ring.ceiling(key.hashCode()));
 		}
 	}
+
 	@Override
 	public boolean ContainsNode(Address node) {
-		if(addresses.containsValue(node)) {
+		if (addresses.containsValue(node)) {
 			return true;
 		}
 		return false;
 	}
+
 	@Override
 	public int size() {
 		return addresses.size();
@@ -45,7 +47,7 @@ public class ConsistentHash implements Strategy {
 
 	@Override
 	public void delete(Address node) {
-		addresses.remove(node.hashCode(),node);
+		addresses.remove(node.hashCode(), node);
 		ring.remove(node.hashCode());
 	}
 
