@@ -9,4 +9,6 @@ public interface Strategy {
     boolean ContainsNode(Address node);
     
     int size();
+    
+    void delete(Address node);
 }

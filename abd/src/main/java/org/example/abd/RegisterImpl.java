@@ -1,10 +1,9 @@
 package org.example.abd;
 
-import java.util.Date;
-import java.util.concurrent.Callable;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
-import java.util.function.Supplier;
 
 import org.apache.commons.lang3.SerializationUtils;
 import org.example.abd.cmd.Command;
@@ -39,7 +38,7 @@ public class RegisterImpl<V> extends ReceiverAdapter implements Register<V>{
     }
 
     public void init(boolean isWritable) throws Exception{
-//    	 this.value = 0;
+    	 this.value = null;
          this.label = 0;
          this.max = 0;
          this.isWritable = isWritable;
@@ -56,22 +55,25 @@ public class RegisterImpl<V> extends ReceiverAdapter implements Register<V>{
 
     @Override
     public V read() {
+    	List<Command<V>> rst = new ArrayList<>();
     	for(Address e : this.channel.getView().getMembers()) {
     		pending = CompletableFuture.supplyAsync(() -> {
     			send(e, factory.newReadRequest());
-    			return null;
+    			return pending.join();
     		});
     	}
-    	try {
-    		for(int i = 0; i < this.quorumSystem.quorumSize(); i++) {
-    			pending.get();
-    		}
-		} catch (InterruptedException e1) {
-			e1.printStackTrace();
-		} catch (ExecutionException e1) {
-			e1.printStackTrace();
+		for(int i = 0; i < this.channel.getView().getMembers().size(); i++) {
+    		rst.add(pending.join());
 		}
-        return null;
+		int maxTag = rst.get(0).getTag();
+		V value = rst.get(0).getValue();
+		for(Command<V> c : rst) {
+			if(c.getTag() > maxTag) {
+				maxTag = c.getTag();
+				value = c.getValue();
+			}
+		}
+        return value;
     }
 
     @Override
@@ -80,58 +82,52 @@ public class RegisterImpl<V> extends ReceiverAdapter implements Register<V>{
     	for(Address e : this.quorumSystem.pickQuorum()) {
     		pending = CompletableFuture.supplyAsync(() -> {
     			send(e,factory.newWriteRequest(value, this.label));
-    			return null;
+    			return pending.join();
     		});
     	}
-    	try {
-    		for(int i = 0; i < this.quorumSystem.quorumSize(); i++) {
-    			pending.get();
-    		}
-		} catch (InterruptedException e1) {
-			e1.printStackTrace();
-		} catch (ExecutionException e1) {
-			e1.printStackTrace();
+		for(int i = 0; i < this.quorumSystem.quorumSize(); i++) {
+			pending.join();
 		}
     }
 
-//    private V execute(Command cmd){
-//    	if(cmd instanceof ReadRequest) {
-//    		return this.read();
-//    	} else if (cmd instanceof WriteRequest) {
-//    		if(this.isWritable == false) {
-//    			new IllegalStateException();
-//    		} else {
-//    			this.write((V) cmd.getValue());
-//    			return null;
-//    		}	 
-//    	}
-//    }
+    private V execute(Command cmd){
+    	if(cmd instanceof ReadRequest) {
+    		return this.read();
+    	} else if (cmd instanceof WriteRequest) {
+    		if(this.isWritable == false) {
+    			new IllegalStateException();
+    		} else {
+    			this.write((V) cmd.getValue());
+    			return null;
+    		}	 
+    	}
+    }
 
-//    // Message handlers
-//    private class CmdHandler implements Callable<Void> {
-//
-//    	Address addr;
-//    	Command cmd;
-//    	
-//    	CmdHandler(Address addr, Command cmd) {
-//    		this.addr = addr;
-//    		this.cmd = cmd;
-//    	}
-//		
-//		@Override
-//		public Void call() throws Exception {
-//			if(cmd instanceof ReadRequest) {
-//				return null;
-//			}else if(cmd instanceof ReadRequest) {
-//				return null;
-//			}else if(cmd instanceof ReadRequest || cmd instanceof WriteRequest) {
-//				execute(cmd);
-//				return null;
-//			} 
-//			return null;
-//		}
-//    	
-//    }
+    // Message handlers
+    private class CmdHandler implements Callable<Void> {
+
+    	Address addr;
+    	Command cmd;
+    	
+    	CmdHandler(Address addr, Command cmd) {
+    		this.addr = addr;
+    		this.cmd = cmd;
+    	}
+		
+		@Override
+		public Void call() throws Exception {
+			if(cmd instanceof ReadReply) {
+				return null;
+			}else if(cmd instanceof WriteReply) {
+				return null;
+			}else if(cmd instanceof ReadRequest || cmd instanceof WriteRequest) {
+				execute(cmd);
+				return null;
+			} 
+			return null;
+		}
+    	
+    }
 
     @Override
     public void receive(Message msg) {

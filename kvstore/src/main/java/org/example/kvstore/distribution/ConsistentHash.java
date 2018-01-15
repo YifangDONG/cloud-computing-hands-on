@@ -33,14 +33,20 @@ public class ConsistentHash implements Strategy {
 	}
 	@Override
 	public boolean ContainsNode(Address node) {
-		if(this.addresses.containsValue(node)) {
+		if(addresses.containsValue(node)) {
 			return true;
 		}
 		return false;
 	}
 	@Override
 	public int size() {
-		return this.addresses.size();
+		return addresses.size();
+	}
+
+	@Override
+	public void delete(Address node) {
+		addresses.remove(node.hashCode(),node);
+		ring.remove(node.hashCode());
 	}
 
 }
