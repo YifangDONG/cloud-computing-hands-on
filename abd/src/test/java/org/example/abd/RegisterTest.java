@@ -13,7 +13,7 @@ import java.util.concurrent.Future;
 
 public class RegisterTest {
 
-    @Test
+//    @Test
     public void sequential() {
         Manager manager = new Manager();
         Register<Integer> copy1 = manager.newRegister(true);
@@ -26,7 +26,7 @@ public class RegisterTest {
 
     }
 
-  /*  @Test
+    @Test
     public void concurrent() throws ExecutionException, InterruptedException {
         int NCALLS = 1000;
 
@@ -45,7 +45,7 @@ public class RegisterTest {
             future.get();
         }
     }
-*/
+
     //
 
     private abstract class Worker implements Callable<Void>{

@@ -1,10 +1,8 @@
 package org.example.abd;
 
 import java.util.ArrayList;
-import java.util.LinkedList;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.ExecutionException;
 
 import org.apache.commons.lang3.SerializationUtils;
 import org.example.abd.cmd.Command;
@@ -36,17 +34,24 @@ public class RegisterImpl<V> extends ReceiverAdapter implements Register<V> {
 
 	public RegisterImpl(String name) {
 		this.name = name;
-		factory = new CommandFactory<>();
+		this.factory = new CommandFactory<>();
 	}
 
 	public void init(boolean isWritable) throws Exception {
 		value = null;
 		label = 0;
-		max = 0;
+		max = 0;		
+		if(debug) {System.out.println(isWritable);}
 		this.isWritable = isWritable;
+		
 		channel = new JChannel();
+		if(debug) {System.out.println("channel create success");}
 		channel.setReceiver(this);
+		if(debug) {System.out.println("channel setReceiver success");}
+		if(debug) {System.out.println(this.name);}
 		channel.connect(this.name);
+		if(debug) {System.out.println("channel connect success");}
+		
 	}
 
 	@Override
@@ -63,7 +68,6 @@ public class RegisterImpl<V> extends ReceiverAdapter implements Register<V> {
 			pending = new CompletableFuture<>();
 			send(e, factory.newReadRequest());
 			replys.add(pending.join());
-
 		}
 		if(debug) {System.out.println(replys);}
 		int maxTag = replys.get(0).getTag();
