@@ -20,14 +20,14 @@ import org.jgroups.View;
 
 public class RegisterImpl<V> extends ReceiverAdapter implements Register<V> {
 
-	private boolean debug = true;
+	private boolean debug = false;
 	private String name;
 	private boolean isWritable;
 	private V value;
 	private int label;
 	private int max;
 	private Majority quorumSystem;
-	private CompletableFuture<Command> pending;
+	private CompletableFuture<Command> replies;
 
 	private CommandFactory<V> factory;
 	private JChannel channel;
@@ -40,18 +40,17 @@ public class RegisterImpl<V> extends ReceiverAdapter implements Register<V> {
 	public void init(boolean isWritable) throws Exception {
 		value = null;
 		label = 0;
-		max = 0;		
-		if(debug) {System.out.println(isWritable);}
+		max = 0;
 		this.isWritable = isWritable;
-		
+
 		channel = new JChannel();
-		if(debug) {System.out.println("channel create success");}
 		channel.setReceiver(this);
-		if(debug) {System.out.println("channel setReceiver success");}
-		if(debug) {System.out.println(this.name);}
 		channel.connect(this.name);
-		if(debug) {System.out.println("channel connect success");}
-		
+
+	}
+
+	public void stop() {
+		this.channel.close();
 	}
 
 	@Override
@@ -65,11 +64,13 @@ public class RegisterImpl<V> extends ReceiverAdapter implements Register<V> {
 	public V read() {
 		List<Command> replys = new ArrayList<>();
 		for (Address e : quorumSystem.pickQuorum()) {
-			pending = new CompletableFuture<>();
+			replies = new CompletableFuture<>();
 			send(e, factory.newReadRequest());
-			replys.add(pending.join());
+			if (debug) {
+				System.out.println(replies.join() + "from channel " + e);
+			}
+			replys.add(replies.join());
 		}
-		if(debug) {System.out.println(replys);}
 		int maxTag = replys.get(0).getTag();
 		V value = (V) replys.get(0).getValue();
 		for (Command<V> c : replys) {
@@ -78,23 +79,27 @@ public class RegisterImpl<V> extends ReceiverAdapter implements Register<V> {
 				value = c.getValue();
 			}
 		}
+		for (Address e : this.quorumSystem.pickQuorum()) {
+			replies = new CompletableFuture<>();
+			send(e, factory.newWriteRequest(value, maxTag));
+			replies.join();
+		}
 		return value;
 	}
 
 	@Override
 	public void write(V v) {
-		if(isWritable) {
+		if (isWritable) {
 			this.label = ++this.max;
 			for (Address e : this.quorumSystem.pickQuorum()) {
-				pending = new CompletableFuture<>();
-				send(e, factory.newWriteRequest(value, this.label));
-				pending.join();
+				replies = new CompletableFuture<>();
+				send(e, factory.newWriteRequest(v, this.label));
+				replies.join();
 			}
-		}else {
+		} else {
 			throw new IllegalStateException();
 		}
 	}
-	
 
 	// Message handlers
 
@@ -111,7 +116,7 @@ public class RegisterImpl<V> extends ReceiverAdapter implements Register<V> {
 			}
 			send(sender, factory.newWriteReply());
 		} else if (cmd instanceof ReadReply || cmd instanceof WriteReply) {
-			pending.complete(cmd);
+			replies.complete(cmd);
 		}
 	}
 

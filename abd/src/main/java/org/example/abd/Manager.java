@@ -26,5 +26,9 @@ public class Manager {
         }
         return null;
     }
+    
+	public void stop(Register<?> reg) {
+		((RegisterImpl<?>) reg).stop();
+	}
 
 }
